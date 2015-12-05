@@ -11,6 +11,7 @@
 	 get/2, 
 	 get/3,
 	 to_list/1,
+	 gen_module_name/0,
 	 purge/1]).
 
 -define(ALL, all).
@@ -43,7 +44,7 @@
 %% </pre>
 create(L, GetKey, GetValue) when is_list(L) andalso L /= [] 
 				 andalso is_function(GetKey) andalso is_function(GetValue)->
-    ModName = choose_module_name(),
+    ModName = gen_module_name(),
     ok = create(ModName, L, GetKey, GetValue),
     ModName.
 
@@ -91,12 +92,13 @@ purge(ModName) ->
     code:purge(ModName),
     code:delete(ModName).
 
-%% internal functions
-% @private
--spec choose_module_name() -> atom().
-choose_module_name() ->
+-spec gen_module_name() -> atom().
+%% @doc Generate a unique random module name
+gen_module_name() ->
     list_to_atom("fling$" ++ md5hex(term_to_binary(erlang:make_ref()))).
 
+%% internal functions
+% @private
 -spec md5hex( binary() ) -> string().
 md5hex(Data) ->
     binary_to_list(hexlify(erlang:md5(Data))).
