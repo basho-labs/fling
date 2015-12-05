@@ -1,0 +1,12 @@
+%% ex: ts=4 sw=4 et
+{application, fling,
+ [
+  {description, "Library that abuses module constant pool"},
+  {vsn, "1.0"},
+  {modules, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {registered, []}
+ ]}.
