@@ -10,8 +10,10 @@
 	 create/4, 
 	 get/2, 
 	 get/3,
+	 to_list/1,
 	 purge/1]).
 
+-define(ALL, all).
 -define(GETTER, term).
 -define(GETTER(K), term(K)).
 
@@ -27,8 +29,8 @@
 %%
 %% A simple example might be:
 %% <pre>
-%% get_key({K, _V}) -> K.
-%% get_value({_K, V}) -> V.
+%% GetKey = fun({K, _V}) -> K end.
+%% GetValue = fun({_K, V}) -> V end.
 %% </pre>
 %%
 %% A more complex example might be:
@@ -69,7 +71,7 @@ get(ModName, K) ->
     get(ModName, K, undefined).
 
 -spec get(ModName :: atom(), Key :: term(), Default :: term()) -> term().
-%% @doc Get the term for K or return Default.
+%% @doc Get the term for K or return Default if K is not found.
 get(ModName, K, Default) ->
     try 
 	ModName:?GETTER(K)
@@ -77,6 +79,11 @@ get(ModName, K, Default) ->
 	error:function_clause ->
             Default
     end.
+
+-spec to_list(ModName :: atom()) -> [ tuple() ].
+%% @doc Return all input tuples from the constructed module as a list.
+to_list(ModName) when is_atom(ModName) ->
+   ModName:all().
 
 -spec purge( ModName :: atom() ) -> boolean().
 %% @doc Purges and removes the given module
@@ -116,7 +123,9 @@ compile(Module, L, GetKey, GetValue) ->
 	       GetKey :: get_expr_fun(),
 	     GetValue :: get_expr_fun() ) -> [erl_syntax:syntaxTree()].
 forms(Module, L, GetKey, GetValue) ->
-    [erl_syntax:revert(X) || X <- [ module_header(Module), export_getter(?GETTER), 
+    [erl_syntax:revert(X) || X <- [ module_header(Module), 
+				    handle_exports(?GETTER), 
+				    make_all(L),
 				    make_lookup_terms(?GETTER, L, GetKey, GetValue) ] ].
 
 -spec module_header( ModName :: atom() ) -> erl_syntax:syntaxTree().
@@ -126,15 +135,26 @@ module_header(Module) ->
      erl_syntax:atom(module),
      [erl_syntax:atom(Module)]).
 
-%% -export([ term/1 ]).
--spec export_getter( Getter :: atom() ) -> erl_syntax:syntaxTree().
-export_getter(Getter) ->
+%% -export([ term/1, all/0 ]).
+-spec handle_exports( Getter :: atom() ) -> erl_syntax:syntaxTree().
+handle_exports(Getter) ->
     erl_syntax:attribute(
        erl_syntax:atom(export),
        [erl_syntax:list(
          [erl_syntax:arity_qualifier(
             erl_syntax:atom(Getter),
-            erl_syntax:integer(1))])]).
+            erl_syntax:integer(1)),
+	  erl_syntax:arity_qualifier(
+	    erl_syntax:atom(?ALL),
+	    erl_syntax:integer(0))
+	 ])]).
+
+%% all() -> L.
+-spec make_all([ tuple() ]) -> erl_syntax:syntaxTree().
+make_all(L) ->
+    erl_syntax:function(
+      erl_syntax:atom(?ALL),
+      [erl_syntax:clause([], none, [erl_syntax:abstract(L)])]).
 
 %% term(K) -> V;
 -spec make_lookup_terms(   Getter :: atom(), 
@@ -167,6 +187,7 @@ basic_test() ->
     GetKey = fun({K, _V}) -> K end,
     GetValue = fun({_K, V}) -> V end,
     Mod = create(L, GetKey, GetValue),
+    ?assertEqual(L, to_list(Mod)),
     ?assertEqual(1, ?MODULE:get(Mod, a)),
     ?assertEqual(2, ?MODULE:get(Mod, b)),
     ?assertEqual(3, ?MODULE:get(Mod, c)),
@@ -178,6 +199,7 @@ record_test() ->
    GetKey = fun(#person{ phone = P }) -> P end,
    GetValue = fun(#person{ name = N }) -> N end,
    Mod = create(L, GetKey, GetValue),
+   ?assertEqual(L, to_list(Mod)),
    ?assertEqual("mike", ?MODULE:get(Mod, 1)),
    ?assertEqual("joe", ?MODULE:get(Mod, 2)),
    ?assertEqual("robert", ?MODULE:get(Mod, 3)).
