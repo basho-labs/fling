@@ -41,6 +41,7 @@
    modname       :: undefindd | atom(),
    get_key_fun   :: fling_mochiglobal:get_expr_fun(),
    get_value_fun :: fling_mochiglobal:get_expr_fun(),
+   pip = false   :: boolean(), %% 'pip' = promotion in progress
    ticks = 0     :: non_neg_integer(),
    max_ticks = 5 :: pos_integer(),
    secs_per_tick :: pos_integer(),
@@ -131,15 +132,14 @@ handle_cast(Req, State = #state{ tid = undefined }) ->
    lager:warning("Got cast ~p but ETS table has not been given away yet.",
 		 [Req]),
    {noreply, State};
+handle_cast({promote}, State = #state{ pip = true }) ->
+   {noreply, State};
 handle_cast({promote}, State = #state{ modname = M, mode = ets, 
 				       tid = Tid, get_key_fun = GK,
 				       get_value_fun = GV
 				     }) ->
-   lager:notice("Force promoting ETS table ~p to mochiglobal ~p",
-		[Tid, M]),
-   fling_mochiglobal:purge(M),
-   ok = fling_mochiglobal:create(M, ets:tab2list(Tid), GK, GV),
-   {noreply, State#state{ mode = mg, tref = undefined }};
+   promote(Tid, M, GK, GV),
+   {noreply, State#state{ pip = true, tref = undefined }};
 %% puts without a timer ref, so start our tick timer
 handle_cast({put, Obj}, State = #state{ mode = ets, tid = Tid, 
 					tref = undefined, secs_per_tick = S }) ->
@@ -177,16 +177,30 @@ handle_info(?TICK, State = #state{ mode = ets, ticks = T, max_ticks = M,
 handle_info(?TICK, State = #state{ mode = ets, ticks = M, max_ticks = M,
 				   modname = Mod, tid = Tid,
 				   get_key_fun = GK,
-				   get_value_fun = GV
+				   get_value_fun = GV,
+				   pip = false
 				 }) ->
-   lager:notice("Promoting ETS table ~p to mochiglobal module ~p",
-		[Tid, Mod]),
-   fling_mochiglobal:purge(Mod),
-   ok = fling_mochiglobal:create(Mod, ets:tab2list(Tid), GK, GV),
-   {noreply, State#state{ mode = mg, tref = undefined }};
+   promote(Mod, Tid, GK, GV),
+   {noreply, State#state{ pip = true, tref = undefined }};
 handle_info(?TICK, State = #state{ mode = mg }) ->
    lager:debug("Got a tick while in mochiglobal mode.", []),
    {noreply, State#state{ tref = undefined }};
+handle_info(?TICK, State = #state{ pip = true }) ->
+   lager:debug("Got a tick while promotion in progress.", []),
+   {noreply, State#state{ tref = undefined }};
+handle_info({'DOWN', Mref, process, Pid, normal}, State) ->
+   ModName = erlang:erase(Mref),
+   Mref = erlang:erase(ModName),
+   lager:debug("Promotion of module ~p completed when ~p exited normally.", 
+	       [ModName, Pid]),
+   {noreply, State#state{ pip = false, mode = mg }};
+handle_info({'DOWN', Mref, process, Pid, Error}, State) ->
+   ModName = erlang:erase(Mref),
+   Mref = erlang:erase(ModName),
+   lager:error("Promotion of module ~p failed because ~p in ~p.", 
+	       [ModName, Error, Pid]),
+   {noreply, State#state{ pip = false }};
+
 handle_info(Info, State) ->
    lager:warning("Unknown info ~p", [Info]),
    {noreply, State}.
@@ -207,3 +221,13 @@ get_env(Setting, Default) ->
       undefined -> Default;
       {ok, Value} -> Value
    end.
+
+promote(Tid, ModName, GetKey, GetValue) ->
+   {Pid, _Mref} = spawn_monitor(fun() -> create_mochiglobal(Tid, ModName, GetKey, GetValue) end),
+   lager:notice("Promoting ETS table ~p to mochiglobal module ~p in pid ~p",
+		[Tid, ModName, Pid]),
+   ok.
+
+create_mochiglobal(Tid, ModName, GetKey, GetValue) ->
+   fling_mochiglobal:purge(ModName),
+   ok = fling_mochiglobal:create(ModName, ets:tab2list(Tid), GetKey, GetValue).
