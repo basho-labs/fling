@@ -52,24 +52,35 @@
 -define(TICK, fling_tick).
 
 %% public API
+%% @doc Start a cache manager, and generate a unique module name.
 start_link(GetKey, GetValue) ->
    start_link(GetKey, GetValue, undefined).
 
+%% @doc Start a cache manager using the given values.
 start_link(GetKey, GetValue, ModName) ->
    gen_server:start_link(?MODULE, [GetKey, GetValue, ModName], []).
 
+%% @doc Synchronously get a value from the cache.
+%%
+%% Typically, gets ought to be done directly against the ETS table that backs
+%% the cache so they do not go through the gen_server.
 get(Pid, Key) ->
    gen_server:call(Pid, {get, Key}, ?TIMEOUT).
 
+%% @doc Perform a synchronous write into the cache.
 put(Pid, Obj) ->
    gen_server:call(Pid, {put, Obj}, ?TIMEOUT).
 
+%% @doc Perform asynchronous write into the cache.
 put_async(Pid, Obj) ->
    gen_server:cast(Pid, {put, Obj}).
 
+%% @doc Attempt to promote the cache into a module even if the tick timer
+%% hasn't expired.
 promote(Pid) ->
    gen_server:cast(Pid, {promote}).
 
+%% @doc Synchronously get the current cache state.
 status(Pid) ->
    gen_server:call(Pid, {status}, ?TIMEOUT).
 
@@ -170,6 +181,12 @@ handle_info({'ETS-TRANSFER', Tid, From, Options}, State = #state{ secs_per_tick 
    lager:debug("Got ETS table ~p from ~p with options ~p", [Tid, From, Options]),
    Tref = schedule_tick(S),
    {noreply, State#state{ tid = Tid, tref = Tref }};
+handle_info({'ETS-TRANSFER', Tid, From, _Options}, State = #state{ tid = Current }) ->
+   %% This clause should never be executed but...
+   lager:error("ETS transfer request from ~p for ETS table ~p but I already have ETS table ~p!",
+	       [From, Tid, Current]),
+   {noreply, State};
+
 handle_info(?TICK, State = #state{ mode = ets, ticks = T, max_ticks = M, 
 					secs_per_tick = S }) when T < M ->
    Tref = schedule_tick(S),
