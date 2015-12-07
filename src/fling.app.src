@@ -9,6 +9,6 @@
                   stdlib,
                   lager
                  ]},
-  {mod, [fling_app]},
+  {mod, {fling_app, []}},
   {registered, []}
  ]}.

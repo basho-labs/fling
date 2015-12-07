@@ -15,6 +15,10 @@ start_ets_server(GetKey, GetValue, ModName) ->
 
 init([]) ->
     SupFlags = {simple_one_for_one, 10, 10},
-    ETS_Server_Spec = {undefined, {fling_ets, start_link, []},
-                temporary, 2000, worker, [fling_ets]},
-    {ok, {SupFlags, [ETS_Server_Spec]}}.
+    ETSServerSpec = {fling_ets_server,
+		       {fling_ets, start_link, []},
+		       temporary,
+		       2000,
+		       worker,
+		       [fling_ets]},
+    {ok, {SupFlags, [ETSServerSpec]}}.

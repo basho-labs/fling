@@ -20,6 +20,7 @@
 %% ETS and the timer to promote a new module starts again.
 -module(fling).
 -export([
+	 start/0,
 	 gen_module_name/0,
 	 manage/4,
 	 state/1,
@@ -28,6 +29,10 @@
 	 put/2,
 	 put_async/2
 	]).
+
+start() ->
+    application:ensure_all_started(fling),
+    application:start(fling).
 
 %% @doc This method gives an ETS table away to fling. In general, 
 %% `public' and `protected' tables work best. The pid returned is
