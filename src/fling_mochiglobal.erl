@@ -88,7 +88,7 @@ to_list(ModName) when is_atom(ModName) ->
 
 -spec purge( ModName :: atom() ) -> boolean().
 %% @doc Purges and removes the given module
-purge(ModName) ->
+purge(ModName) when is_atom(ModName) ->
     code:purge(ModName),
     code:delete(ModName).
 

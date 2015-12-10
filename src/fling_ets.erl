@@ -18,6 +18,7 @@
 
 -export([
    start_link/2,
+   start_link/3,
    get/2,
    put/2,
    put_async/2,
@@ -197,7 +198,7 @@ handle_info(?TICK, State = #state{ mode = ets, ticks = M, max_ticks = M,
 				   get_value_fun = GV,
 				   pip = false
 				 }) ->
-   promote(Mod, Tid, GK, GV),
+   promote(Tid, Mod, GK, GV),
    {noreply, State#state{ pip = true, tref = undefined }};
 handle_info(?TICK, State = #state{ mode = mg }) ->
    lager:debug("Got a tick while in mochiglobal mode.", []),
@@ -205,15 +206,11 @@ handle_info(?TICK, State = #state{ mode = mg }) ->
 handle_info(?TICK, State = #state{ pip = true }) ->
    lager:debug("Got a tick while promotion in progress.", []),
    {noreply, State#state{ tref = undefined }};
-handle_info({'DOWN', Mref, process, Pid, normal}, State) ->
-   ModName = erlang:erase(Mref),
-   Mref = erlang:erase(ModName),
+handle_info({'DOWN', _Mref, process, Pid, normal}, State = #state{ modname = ModName }) ->
    lager:debug("Promotion of module ~p completed when ~p exited normally.", 
 	       [ModName, Pid]),
    {noreply, State#state{ pip = false, mode = mg }};
-handle_info({'DOWN', Mref, process, Pid, Error}, State) ->
-   ModName = erlang:erase(Mref),
-   Mref = erlang:erase(ModName),
+handle_info({'DOWN', _Mref, process, Pid, Error}, State = #state{ modname = ModName }) ->
    lager:error("Promotion of module ~p failed because ~p in ~p.", 
 	       [ModName, Error, Pid]),
    {noreply, State#state{ pip = false }};
