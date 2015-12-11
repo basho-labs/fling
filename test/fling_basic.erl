@@ -1,12 +1,17 @@
 -module(fling_basic).
 -compile([export_all]).
 
+%% basic benchmarking test
+
 -include_lib("eunit/include/eunit.hrl").
 
 -record(person, {id, name}).
 
-bench_test() ->
-    {timeout, 60, [fun basic_ets_bench/0, fun basic_mg_bench/0]}.
+bench_ets_test_() ->
+    {timeout, 60, fun() -> basic_ets_bench() end}.
+
+bench_mg_test_() ->
+    {timeout, 60, fun() -> basic_mg_bench() end}.
 
 names() ->
     [<<"sally">>, <<"robert">>, <<"mike">>, <<"joe">>, <<"fred">>, <<"doug">>, 
@@ -25,7 +30,7 @@ basic_ets_bench() ->
     lists:foreach(fun({_Timing, {Id, Name}}) -> ?assertEqual(Name, choose(Id, names())) end, Out),
     Out1 = lists:foldl(fun({Timing, _Value}, Acc) -> orddict:update_counter(Timing, 1, Acc) end, 
                        orddict:new(), Out),
-    io:format(user, "ETS get microseconds: ~p~n", [orddict:to_list(Out1)]).
+    ?debugFmt("ETS get microseconds: ~p~n", [orddict:to_list(Out1)]).
 
 basic_mg_bench() ->
     random:seed({1,2,3}), %% deterministic for now
@@ -33,12 +38,19 @@ basic_mg_bench() ->
     Data = build_data_set(fun make_record/1, CacheSize),
     ModName = fling:gen_module_name(),
     {Time, ok} = promote(ModName, Data),
-    io:format(user, "~p microseconds to compile ~p with ~p elements~n", [Time, ModName, CacheSize]),
+    ?debugFmt("~p microseconds to compile ~p with ~p elements~n", [Time, ModName, CacheSize]),
+    %% this is a random uniform distribute of keys
     Out = mg_bench(ModName, CacheSize, CacheSize * 10),
     lists:foreach(fun({_Timing, {Id, Name}}) -> ?assertEqual(Name, choose(Id, names())) end, Out),
     Out1 = lists:foldl(fun({Timing, _Value}, Acc) -> orddict:update_counter(Timing, 1, Acc) end, 
                        orddict:new(), Out),
-    io:format(user, "mg get microseconds: ~p~n", [orddict:to_list(Out1)]).
+    ?debugFmt("mg get microseconds: ~p~n", [orddict:to_list(Out1)]),
+
+    %% this is the 1000 worst case lookups
+    Out2 = mg_bench_worst_case(ModName, 1000),
+    Out3 = lists:foldl(fun({Timing, _Value}, Acc) -> orddict:update_counter(Timing, 1, Acc) end, 
+                       orddict:new(), Out2),
+    ?debugFmt("mg get 1000 worst case keys microseconds: ~p~n", [orddict:to_list(Out3)]).
 
 promote(ModName, Data) -> 
     timer:tc(fun() -> 
@@ -50,6 +62,16 @@ mg_bench(Mod, CacheSize, GetOps) ->
         X = random:uniform(CacheSize),
         timer:tc(fun() -> mg_get_op(Mod, X) end) 
       end || _ <- lists:seq(1, GetOps) ].
+
+mg_bench_worst_case(Mod, EndKey) ->
+    %% this will fetch the `EndKey' "worst case" keys. These are the keys in
+    %% the compiled module which are farthest from where the Erlang run-time
+    %% system starts to evaluate function heads.  In the basic benchmark we
+    %% generate 10000 keys and the keys are stored in reverse order, which
+    %% means that id 10000 is the very 1st key in the list of function heads
+    %% and id 1 is the very last key.
+    
+    [ timer:tc(fun() -> mg_get_op(Mod, X) end) || X <- lists:seq(EndKey, 1, -1) ].
 
 make_ets(Options) ->
     ets:new(fling_bench_test, [{keypos, 2}] ++ Options).
