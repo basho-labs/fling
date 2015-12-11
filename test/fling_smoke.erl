@@ -24,7 +24,7 @@ smoke() ->
     ?assertEqual([{26, <<"A">>}], fling:get(ets, Tid, ModName, 26)),
     ?assertEqual(undefined, fling:get(ets, Tid, ModName, 999999)),
     {ok, Waits} = wait_until(20, fun() -> case fling:mode(Pid) of ets -> false; mg -> true end end),
-    ?debugFmt("waited ~p secs", [Waits]),
+    ?debugFmt("waited ~p secs", [20-Waits]),
     ?assertEqual(mg, fling:mode(Pid)),
     ?assertEqual([{1, <<"B">>}], fling:get(ets, Tid, ModName, 1)),
     ?assertEqual([{26, <<"A">>}], fling:get(ets, Tid, ModName, 26)),
