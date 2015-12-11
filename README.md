@@ -80,3 +80,14 @@ $ erl -pz ebin deps/*/ebin -s fling
 12> fling:get(ModeA, a) == fling:get(ModeB, a).
 ```
 
+### Basho Bench ###
+If you want to characterize the performance of fling, there is a driver for it in the 
+[basho_bench](https://github.com/basho/basho_bench) framework.  It's on the branch `mra/fling`.
+
+You will need to update the `code_paths` directive in the [configuration file](https://github.com/basho/basho_bench/blob/mra/fling/examples/fling.config#L6-L8) to
+match your own filesystem layout.
+
+Tests can be started like this:
+```shell
+$ ./basho_bench examples/fling.config
+```
