@@ -55,7 +55,7 @@ system.
 
 Example
 -------
-Here's a quick example to illustration how this works.
+Here's a quick example to illustrate how this works.
 
 ### Compile and start up ###
 ```shell
