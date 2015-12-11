@@ -33,6 +33,10 @@
 
 -type fling_mode() :: { ets, Tid :: ets:tid() } | { mg, ModName :: atom() }.
 
+-spec start() -> ok.
+%% @doc Convenience function to start the application from the command line.
+%% 
+%% As in `erl -pz ebin deps/*/ebin -s fling'
 start() ->
     application:ensure_all_started(fling),
     application:start(fling).
@@ -57,9 +61,10 @@ gen_module_name() ->
 
 -spec state( Pid :: pid() ) -> proplists:proplist().
 %% @doc Returns the current state of the cache manager. Keys returned are:
+%%
 %% <ul>
 %% 	<li>`modname' which is the module name if the manager is in `mg' mode</li>
-%% 	<li>`mode' which is the current mode - `ets' or `mg'<li>
+%% 	<li>`mode' which is the current mode - `ets' or `mg'</li>
 %% 	<li>`tid' which is the ETS table identifier</li>
 %% 	<li>`ticks' which is the current tick count</li>
 %% </ul>

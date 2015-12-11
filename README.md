@@ -62,11 +62,11 @@ Example
 4> GetValue = fun({_K, V}) -> V end.
 5> Pid = fling:manage(Tid, GetKey, GetValue, ModName).
 6> fling:put(Pid, [{a,1},{b,2},{c,3}]).
-7> Mode = fling:mode(Pid).
-8> fling:get(Mode, Tid, ModName, a).
+7> ModeA = fling:mode(Tid, ModName).
+8> fling:get(ModeA, a).
 9> timer:sleep(60*1000).
-10> Mode0 = fling:mode(Pid).
-11> fling:get(Mode0, Tid, ModName, a).
-12> fling:get(Mode, Tid, ModName, a) == fling:get(Mode0, Tid, ModName, a).
+10> ModeB = fling:mode(Tid, ModName).
+11> fling:get(ModeB, a).
+12> fling:get(ModeA, a) == fling:get(ModeB, a).
 ```
 
