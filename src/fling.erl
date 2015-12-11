@@ -24,11 +24,14 @@
 	 gen_module_name/0,
 	 manage/4,
 	 state/1,
-	 mode/1,
-	 get/4,
+	 mode_sync/1,
+	 mode/2,
+	 get/2,
 	 put/2,
 	 put_async/2
 	]).
+
+-type fling_mode() :: { ets, Tid :: ets:tid() } | { mg, ModName :: atom() }.
 
 start() ->
     application:ensure_all_started(fling),
@@ -60,27 +63,57 @@ gen_module_name() ->
 %% 	<li>`tid' which is the ETS table identifier</li>
 %% 	<li>`ticks' which is the current tick count</li>
 %% </ul>
+%%
+%% <B>Important</B>: This calls into the cache manager gen_server.
 state(Pid) ->
     fling_ets:status(Pid).
 
--spec mode( Pid :: pid() ) -> mg|ets.
+-spec mode_sync( Pid :: pid() ) -> fling_mode().
 %% @doc Returns the current mode of the cache manager. `ets' means the cache
-%% is still using ETS for reads and writes. `mg' means the cache is in read-only
+%% is using ETS for reads and writes. `mg' means the cache is in read-only
 %% compiled module mode.
-mode(Pid) ->
-    proplists:get_value(mode, state(Pid)).
+%% 
+%% <B>Important</B>: This calls into the cache manager gen_server.
+mode_sync(Pid) ->
+    S = state(Pid),
+    case proplists:get_value(mode, S, ets) of
+	ets ->
+	    {ets, proplists:get_value(tid, S)};
+	mg ->
+	    {mg, proplists:get_value(modname, S)}
+    end.
 
--spec get(mg|ets, Tid :: ets:tid(), ModName :: atom(), Key :: term() ) -> Value :: term() | undefined.
-get(mg, _Tid, ModName, Key) -> 
+-spec mode(Tid :: ets:tid(), ModName :: atom()) -> Mode :: fling_mode().
+%% @doc Returns the current mode of the cache. Does not call into a gen_server.
+mode(Tid, ModName) ->
+    fling_mochiglobal:mode(ModName, Tid).
+
+-spec get( Mode :: fling_mode(), Key :: term() ) -> Value :: term() | undefined.
+%% @doc Get a value from the cache. Does not call into the cache manager.
+get({mg, ModName}, Key) -> 
     fling_mochiglobal:get(ModName, Key);
-get(ets, Tid, _ModName, Key) ->
+get({ets, Tid}, Key) ->
     case ets:lookup(Tid, Key) of
 	[] -> undefined;
 	Value -> Value
     end.
 
+-spec put( Pid :: pid(), Obj :: tuple() | [ tuple() ] ) -> ok.
+%% @doc Store a value in the cache. When you store a value, 
+%% the cache manager resets its tick count for promotion purposes.
+%% 
+%% If a put is processed while the cache is in compiled module
+%% mode, the put will revert the mode back to ets and start a
+%% new timer.
 put(Pid, Obj) ->
     fling_ets:put(Pid, Obj).
 
+-spec put_async( Pid :: pid(), Obj :: tuple() | [ tuple() ] ) -> ok.
+%% @doc Asynchronously store a value in the cache. When you store a
+%% value, the cache manager resets its tick count for promotion purposes.
+%%
+%% If a put is processed while the cache is in compiled module
+%% mode, the put will revert the mode back to ets and start a
+%% new timer.
 put_async(Pid, Obj) ->
     fling_ets:put_async(Pid, Obj).

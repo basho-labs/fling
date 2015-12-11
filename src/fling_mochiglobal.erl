@@ -10,6 +10,7 @@
 	 create/4, 
 	 get/2, 
 	 get/3,
+	 mode/2,
 	 to_list/1,
 	 gen_module_name/0,
 	 purge/1]).
@@ -81,6 +82,17 @@ get(ModName, K, Default) ->
             Default
     end.
 
+-spec mode(ModName :: atom(), Tid :: ets:tid()) -> {ets, Tid :: ets:tid()}
+						   | {mg, ModName :: atom()}.
+%% @doc Get the current mode.
+mode(ModName, Tid) ->
+   try
+      ModName:mode()
+   catch
+      error:undef ->
+	 {ets, Tid}
+   end.
+
 -spec to_list(ModName :: atom()) -> [ tuple() ].
 %% @doc Return all input tuples from the constructed module as a list.
 to_list(ModName) when is_atom(ModName) ->
@@ -128,6 +140,7 @@ forms(Module, L, GetKey, GetValue) ->
     [erl_syntax:revert(X) || X <- [ module_header(Module), 
 				    handle_exports(?GETTER), 
 				    make_all(L),
+				    make_mode(Module),
 				    make_lookup_terms(?GETTER, L, GetKey, GetValue) ] ].
 
 -spec module_header( ModName :: atom() ) -> erl_syntax:syntaxTree().
@@ -147,6 +160,9 @@ handle_exports(Getter) ->
             erl_syntax:atom(Getter),
             erl_syntax:integer(1)),
 	  erl_syntax:arity_qualifier(
+	    erl_syntax:atom(mode),
+	    erl_syntax:integer(0)),
+	  erl_syntax:arity_qualifier(
 	    erl_syntax:atom(?ALL),
 	    erl_syntax:integer(0))
 	 ])]).
@@ -157,6 +173,11 @@ make_all(L) ->
     erl_syntax:function(
       erl_syntax:atom(?ALL),
       [erl_syntax:clause([], none, [erl_syntax:abstract(L)])]).
+
+make_mode(ModName) ->
+    erl_syntax:function(
+      erl_syntax:atom(mode),
+      [erl_syntax:clause([], none, [erl_syntax:abstract({mg, ModName})])]).
 
 %% term(K) -> V;
 -spec make_lookup_terms(   Getter :: atom(), 

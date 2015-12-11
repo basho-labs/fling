@@ -19,18 +19,22 @@ smoke() ->
     true = ets:insert(Tid, Data),
     ModName = fling:gen_module_name(),
     Pid = fling:manage(Tid, fun smoke_get_key/1, fun smoke_get_value/1, ModName),
-    ?assertEqual(ets, fling:mode(Pid)),
-    ?assertEqual([{1, <<"B">>}], fling:get(ets, Tid, ModName, 1)),
-    ?assertEqual([{26, <<"A">>}], fling:get(ets, Tid, ModName, 26)),
-    ?assertEqual(undefined, fling:get(ets, Tid, ModName, 999999)),
-    {ok, Waits} = wait_until(20, fun() -> case fling:mode(Pid) of ets -> false; mg -> true end end),
+    ModeA = fling:mode(Tid, ModName),
+    ?assertEqual({ets, Tid}, ModeA),
+    ?assertEqual(fling:mode_sync(Pid), fling:mode(Tid, ModName)),
+    ?assertEqual([{1, <<"B">>}], fling:get(ModeA, 1)),
+    ?assertEqual([{26, <<"A">>}], fling:get(ModeA, 26)),
+    ?assertEqual(undefined, fling:get(ModeA, 999999)),
+    {ok, Waits} = wait_until(20, fun() -> is_mode_mg(fling:mode(Tid, ModName)) end),
     ?debugFmt("waited ~p secs", [20-Waits]),
-    ?assertEqual(mg, fling:mode(Pid)),
-    ?assertEqual([{1, <<"B">>}], fling:get(ets, Tid, ModName, 1)),
-    ?assertEqual([{26, <<"A">>}], fling:get(ets, Tid, ModName, 26)),
-    ?assertEqual(<<"B">>, fling:get(mg, Tid, ModName, 1)),
-    ?assertEqual(<<"A">>, fling:get(mg, Tid, ModName, 26)),
-    ?assertEqual(undefined, fling:get(mg, Tid, ModName, 999999)).
+    ModeB = fling:mode(Tid, ModName),
+    ?assertEqual({mg, ModName}, ModeB),
+    ?assertEqual(fling:mode_sync(Pid), fling:mode(Tid, ModName)),
+    ?assertEqual([{1, <<"B">>}], fling:get(ModeA, 1)),
+    ?assertEqual([{26, <<"A">>}], fling:get(ModeA, 26)),
+    ?assertEqual(<<"B">>, fling:get(ModeB, 1)),
+    ?assertEqual(<<"A">>, fling:get(ModeB, 26)),
+    ?assertEqual(undefined, fling:get(ModeB, 999999)).
 
 wait_until(0, _F) -> timeout;
 wait_until(Limit, F) ->
@@ -40,3 +44,6 @@ wait_until(Limit, F) ->
             timer:sleep(1000),
             wait_until(Limit - 1, F)
     end.
+
+is_mode_mg({ets, _}) -> false;
+is_mode_mg({mg, _}) -> true.
