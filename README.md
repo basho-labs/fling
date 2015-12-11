@@ -55,6 +55,16 @@ system.
 
 Example
 -------
+Here's a quick example to illustration how this works.
+
+### Compile and start up ###
+```shell
+$ rebar get-deps
+$ rebar compile
+$ erl -pz ebin deps/*/ebin -s fling
+```
+
+### Operation ###
 ```erlang
 1> Tid = ets:new(example, []).
 2> ModName = fling:gen_module_name().
