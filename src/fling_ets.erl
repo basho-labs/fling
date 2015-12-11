@@ -105,6 +105,7 @@ init([GetKey, GetValue, ModName]) ->
 	      get_value_fun = GetValue },
    {ok, State}.
 
+%% @private
 handle_call(Req, _From, State = #state{ tid = undefined }) ->
    lager:warning("Got call ~p but ETS table has not been given away yet.",
 		 [Req]),
@@ -140,6 +141,7 @@ handle_call(Req, _From, State) ->
    lager:error("Unknown call ~p.", [Req]),
    {reply, whoa, State}.
 
+%% @private
 handle_cast(Req, State = #state{ tid = undefined }) ->
    lager:warning("Got cast ~p but ETS table has not been given away yet.",
 		 [Req]),
@@ -177,6 +179,7 @@ handle_cast(Req, State) ->
    lager:warning("Unknown cast ~p", [Req]),
    {noreply, State}.
 
+%% @private
 handle_info({'ETS-TRANSFER', Tid, From, Options}, State = #state{ secs_per_tick = S, 
 								  tid = undefined }) ->
    lager:debug("Got ETS table ~p from ~p with options ~p", [Tid, From, Options]),
@@ -219,10 +222,12 @@ handle_info(Info, State) ->
    lager:warning("Unknown info ~p", [Info]),
    {noreply, State}.
 
+%% @private
 terminate(_Reason, #state{ modname = M }) ->
    fling_mochiglobal:purge(M),
    ok.
 
+%% @private
 code_change(_Old, State, _Extra) ->
    {ok, State}.
 
