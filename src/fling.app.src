@@ -10,5 +10,10 @@
                   lager
                  ]},
   {mod, {fling_app, []}},
-  {registered, []}
+  {registered, []},
+
+
+  {contributors,["Mark Allen"]},
+  {licenses,["Apache"]},
+  {links,[{"Github","https://github.com/basho-labs/fling"}]}
  ]}.
