@@ -7,6 +7,9 @@
 
 -record(person, {id, name}).
 
+%% -define(SEED, {1,2,3}).
+-define(SEED, os:timestamp()).
+
 bench_ets_test_() ->
     {timeout, 60, fun() -> basic_ets_bench() end}.
 
@@ -22,7 +25,7 @@ choose(I, L) ->
     lists:nth(((I rem length(L))+1), L).
 
 basic_ets_bench() ->
-    random:seed({1,2,3}), %% deterministic for now
+    random:seed(?SEED),
     Tid = make_ets([{read_concurrency, false}, {write_concurrency, false}]),
     CacheSize = 10000,
     Data = build_data_set(fun make_record/1, CacheSize),
@@ -33,7 +36,7 @@ basic_ets_bench() ->
     ?debugFmt("ETS get microseconds: ~p~n", [orddict:to_list(Out1)]).
 
 basic_mg_bench() ->
-    random:seed({1,2,3}), %% deterministic for now
+    random:seed(?SEED),
     CacheSize = 10000,
     Data = build_data_set(fun make_record/1, CacheSize),
     ModName = fling:gen_module_name(),
