@@ -16,6 +16,9 @@ bench_ets_test_() ->
 bench_mg_test_() ->
     {timeout, 60, fun() -> basic_mg_bench() end}.
 
+bench_gb_test_() ->
+    {timeout, 60, fun() -> basic_gb_bench() end}.
+
 names() ->
     [<<"sally">>, <<"robert">>, <<"mike">>, <<"joe">>, <<"fred">>, <<"doug">>, 
      <<"jennifer">>, <<"enrique">>, <<"hodor">>, <<"alex">>, <<"bobbi">>, 
@@ -43,7 +46,7 @@ basic_mg_bench() ->
     {Time, ok} = promote(ModName, Data),
     ?debugFmt("~p microseconds to compile ~p with ~p elements~n", [Time, ModName, CacheSize]),
     %% this is a random uniform distribute of keys
-    Out = mg_bench(ModName, CacheSize, CacheSize * 10),
+    Out = mg_bench(ModName, fun mg_get_op/2, CacheSize, CacheSize * 10),
     lists:foreach(fun({_Timing, {Id, Name}}) -> ?assertEqual(Name, choose(Id, names())) end, Out),
     Out1 = lists:foldl(fun({Timing, _Value}, Acc) -> orddict:update_counter(Timing, 1, Acc) end, 
                        orddict:new(), Out),
@@ -55,15 +58,33 @@ basic_mg_bench() ->
                        orddict:new(), Out2),
     ?debugFmt("mg get 1000 worst case keys microseconds: ~p~n", [orddict:to_list(Out3)]).
 
+basic_gb_bench() ->
+    random:seed(?SEED),
+    CacheSize = 10000,
+    Data = build_data_set(fun make_record/1, CacheSize),
+    ModName = fling:gen_module_name(),
+    {Time, ok} = promote_gb(ModName, Data),
+    ?debugFmt("~p microseconds to compile ~p (gb_trees) with ~p elements~n", [Time, ModName, CacheSize]),
+    Out = mg_bench(ModName, fun gb_get_op/2, CacheSize, CacheSize * 10),
+    lists:foreach(fun({_Timing, {Id, Name}}) -> ?assertEqual(Name, choose(Id, names())) end, Out),
+    Out1 = lists:foldl(fun({Timing, _Value}, Acc) -> orddict:update_counter(Timing, 1, Acc) end, 
+                       orddict:new(), Out),
+    ?debugFmt("gb_trees get microseconds: ~p~n", [orddict:to_list(Out1)]).
+
+promote_gb(ModName, Data) ->
+    timer:tc(fun() ->
+        fling_gb:create(ModName, Data, fun basic_get_key/1, fun basic_get_value/1)
+             end).
+
 promote(ModName, Data) -> 
     timer:tc(fun() -> 
     fling_mochiglobal:create(ModName, Data, fun basic_get_key/1, fun basic_get_value/1) 
                           end).
 
-mg_bench(Mod, CacheSize, GetOps) ->
+mg_bench(Mod, GetFun, CacheSize, GetOps) ->
     [ begin
         X = random:uniform(CacheSize),
-        timer:tc(fun() -> mg_get_op(Mod, X) end) 
+        timer:tc(fun() -> GetFun(Mod, X) end) 
       end || _ <- lists:seq(1, GetOps) ].
 
 mg_bench_worst_case(Mod, EndKey) ->
@@ -104,3 +125,6 @@ basic_get_value(#person{ id = Id, name = N}) -> {Id, N}.
 
 mg_get_op(Mod, Id) ->
     fling_mochiglobal:get(Mod, Id).
+
+gb_get_op(Mod, Id) ->
+    fling_gb:get(Mod, Id).
