@@ -145,8 +145,8 @@ forms(Module, L, GetKey, GetValue) ->
     [erl_syntax:revert(X) || X <- [ module_header(Module), 
 				    handle_exports(), 
 				    make_all(L),
-				    make_mode(Module),
-				    make_lookup_terms(L, GetKey, GetValue) ] ].
+				    make_mode(Module) ]
+				    ++ make_lookup_terms(L, GetKey, GetValue) ].
 
 -spec module_header( ModName :: atom() ) -> erl_syntax:syntaxTree().
 %% -module(Module).
@@ -180,9 +180,7 @@ make_mode(ModName) ->
 			   GetKey :: get_expr_fun(), 
 			 GetValue :: get_expr_fun() ) -> [erl_syntax:syntaxTree()].
 make_lookup_terms(L, GetKey, GetValue) ->
-    V = make_terms(L, GetKey, GetValue, []),
-    lager:debug("V:~n~p~n", [V]),
-    V.
+    make_terms(L, GetKey, GetValue, []).
 
 -spec make_terms(        L :: [ tuple() ], 
 	            GetKey :: get_expr_fun(),
@@ -195,7 +193,6 @@ make_terms([ H | T ], GetKey, GetValue, Acc) ->
     case is_atom(Key) of
        true ->
 	  F = make_function(Key, GetValue(H)),
-	  lager:error("F:~n~p~n", [F]),
 	  make_terms(T, GetKey, GetValue, [ F | Acc ]);
        false ->
 	  lager:warning("Key ~p is not an atom; skipping~n", [Key]),
